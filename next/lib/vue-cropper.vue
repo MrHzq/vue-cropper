@@ -318,6 +318,18 @@ export default defineComponent({
       type: String,
       default: "",
     },
+    // 更改源码的部分：新增 props - start
+    // 初始展示时依据裁剪款宽度来缩放图片
+    initScaleImageByBoxWidth: {
+      type: Boolean,
+      default: false,
+    },
+    // 裁剪框是否需要将图片包裹(样式和交互都不好看，最好为 false)
+    imgScaleFitCrop: {
+      type: Boolean,
+      default: false,
+    },
+    // 更改源码的部分：新增 props - end
   },
   computed: {
     cropInfo() {
@@ -1750,6 +1762,26 @@ export default defineComponent({
               str = str.replace("%", "");
               imgW = (parseFloat(str) / 100) * this.w;
               scale = imgW / this.trueWidth;
+
+              // 更改源码的部分：初始展示时是否依据裁剪款宽度来缩放图片 - start
+              if(this.initScaleImageByBoxWidth) {
+                let width = parseFloat(this.autoCropWidth);
+                if(width < 1) width *= this.w
+
+                imgH *= scale
+                if(imgH < width) {
+                  // 当图片高度偏小时，则将图片高度处理为裁剪框宽度
+                  imgH = (parseFloat(str) / 100) * width
+                  // 计算缩放比例
+                  scale = imgH / this.trueHeight;
+                } else if(imgW < width) {
+                  // 当图片宽度偏小时，则将图片宽度处理为裁剪框宽度
+                  imgW = (parseFloat(str) / 100) * width
+                  // 计算缩放比例
+                  scale = imgW / this.trueWidth;
+                }
+              }
+              // 更改源码的部分：初始展示时是否依据裁剪款宽度来缩放图片 - end
             }
 
             if (arr.length === 2 && str === "auto") {
@@ -1793,6 +1825,18 @@ export default defineComponent({
         w = maxWidth * 0.8;
         h = maxHeight * 0.8;
       }
+
+      // 更改源码的部分：支持百分比计算大小 - start
+      // 如果 <1 则重新计算容器大小
+      if (w < 1 || h < 1) {
+        // 当 centerBox && initScaleImageByBoxWidth 为 true 时，则表明已前面已处理过了
+        // maxWidth 的值会为 imgW，所以这里不用重复处理，所以返回 1
+        // 否则返回对应小数的 w || h
+        w = maxWidth * (this.centerBox && this.initScaleImageByBoxWidth  ? 1 : w)
+        h = maxHeight * (this.centerBox && this.initScaleImageByBoxWidth  ? 1 : h)
+      }
+      // 更改源码的部分：支持百分比计算大小 - end
+
       w = w > maxWidth ? maxWidth : w;
       h = h > maxHeight ? maxHeight : h;
       if (this.fixed) {
@@ -1910,9 +1954,15 @@ export default defineComponent({
       if (imgW >= this.cropW && imgH >= this.cropH) {
         this.scale = scale;
       } else {
-        this.scale = cropScale;
-        imgW = this.trueWidth * cropScale;
-        imgH = this.trueHeight * cropScale;
+        // 更改源码的部分：新增判断 裁剪框是否需要将图片包裹 - start
+        // 样式上其实不好看而且结合下面(1967行)的判断，图片所处的位置是在裁剪框最下面；并且还不能放大了(要实现的话麻烦)
+        // 当为 false 时即不执行下面的代码，则呈现的效果是图片最小缩放为裁剪框的宽高(小于的话就不能缩放了，跟微信图片裁剪一致)，也比较符合交互直觉
+        if(this.imgScaleFitCrop) {
+        // 更改源码的部分：新增判断 裁剪框是否需要将图片包裹 - end
+          this.scale = cropScale;
+          imgW = this.trueWidth * cropScale;
+          imgH = this.trueHeight * cropScale;
+        }
       }
       if (!this.imgIsQqualCrop) {
         // 左边的横坐标 图片不能超过截图框
